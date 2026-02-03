@@ -1,0 +1,6 @@
+export { Delta, Change } from './core/delta'
+export { Collection } from './core/collection'
+export { Input, input } from './core/input'
+export { tx, isBatching } from './core/tx'
+export { VNode, Props, ComponentFn, createVNode } from './vnode/types'
+export { render } from './render/render'
