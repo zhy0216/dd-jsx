@@ -50,10 +50,10 @@ function processChildren(children: JSXChild | undefined, parentId: string | null
   }
 
   if (children instanceof Collection) {
-    // Reparent collection items
+    // Reparent only root nodes (those with parentId: null)
     return children.map(vnode => ({
       ...vnode,
-      parentId
+      parentId: vnode.parentId === null ? parentId : vnode.parentId
     }))
   }
 
@@ -81,10 +81,11 @@ function processChild(child: JSXChild, parentId: string | null, index: number): 
   }
 
   if (child instanceof Collection) {
+    // Reparent only root nodes (those with parentId: null)
     return child.map(vnode => ({
       ...vnode,
-      parentId,
-      index
+      parentId: vnode.parentId === null ? parentId : vnode.parentId,
+      index: vnode.parentId === null ? index : vnode.index
     }))
   }
 

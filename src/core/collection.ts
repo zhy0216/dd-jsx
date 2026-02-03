@@ -131,6 +131,7 @@ class ConcatCollection<T> extends Collection<T> {
 
 class FlatMapCollection<T, U> extends Collection<U> {
   private innerUnsubs: Map<T, () => void> = new Map()
+  private innerValues: Map<T, U[]> = new Map()
 
   constructor(
     private upstream: Collection<T>,
@@ -145,19 +146,34 @@ class FlatMapCollection<T, U> extends Collection<U> {
     const unsub = this.upstream.subscribe((item, delta) => {
       if (delta === Delta.Insert) {
         const inner = this.flatMapFn(item)
+        const trackedValues: U[] = []
+        this.innerValues.set(item, trackedValues)
+        
         const innerUnsub = inner.subscribe((innerItem, innerDelta) => {
+          if (innerDelta === Delta.Insert) {
+            trackedValues.push(innerItem)
+          } else {
+            const idx = trackedValues.indexOf(innerItem)
+            if (idx >= 0) trackedValues.splice(idx, 1)
+          }
           this.emit(innerItem, innerDelta)
         })
         this.innerUnsubs.set(item, innerUnsub)
       } else {
-        // Retract: unsubscribe from inner and emit retracts
+        // Retract: unsubscribe from inner and emit retracts for tracked values
         const innerUnsub = this.innerUnsubs.get(item)
         if (innerUnsub) {
           innerUnsub()
           this.innerUnsubs.delete(item)
         }
-        // Note: proper retraction would require tracking inner values
-        // This is simplified for now
+        
+        const values = this.innerValues.get(item)
+        if (values) {
+          for (const v of values) {
+            this.emit(v, Delta.Retract)
+          }
+          this.innerValues.delete(item)
+        }
       }
     })
 
@@ -166,6 +182,7 @@ class FlatMapCollection<T, U> extends Collection<U> {
       unsub()
       this.innerUnsubs.forEach(u => u())
       this.innerUnsubs.clear()
+      this.innerValues.clear()
     }
   }
 }
