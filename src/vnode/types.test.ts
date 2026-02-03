@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { VNode, Props, createVNode } from './types'
+import { createVNode } from './types'
 
 describe('VNode', () => {
   it('creates a vnode with required fields', () => {

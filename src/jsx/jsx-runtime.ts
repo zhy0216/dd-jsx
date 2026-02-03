@@ -34,41 +34,14 @@ export function jsx(
 }
 
 function processChildren(children: JSXChild | undefined, parentId: string | null): Collection<VNode> {
-  if (children === undefined || children === null) {
+  return processChild(children, parentId, 0)
+}
+
+function processChild(child: JSXChild | undefined, parentId: string | null, index: number): Collection<VNode> {
+  if (child === undefined || child === null) {
     return Collection.from<VNode>([])
   }
 
-  if (typeof children === 'string' || typeof children === 'number') {
-    const textNode = createVNode({
-      tag: '#text',
-      props: {},
-      text: String(children),
-      parentId,
-      index: 0
-    })
-    return Collection.from([textNode])
-  }
-
-  if (children instanceof Collection) {
-    // Reparent only root nodes (those with parentId: null)
-    return children.map(vnode => ({
-      ...vnode,
-      parentId: vnode.parentId === null ? parentId : vnode.parentId
-    }))
-  }
-
-  if (Array.isArray(children)) {
-    const collections = children.map((child, index) => {
-      const col = processChild(child, parentId, index)
-      return col
-    })
-    return Collection.concat(...collections)
-  }
-
-  return Collection.from<VNode>([])
-}
-
-function processChild(child: JSXChild, parentId: string | null, index: number): Collection<VNode> {
   if (typeof child === 'string' || typeof child === 'number') {
     const textNode = createVNode({
       tag: '#text',
@@ -81,7 +54,6 @@ function processChild(child: JSXChild, parentId: string | null, index: number): 
   }
 
   if (child instanceof Collection) {
-    // Reparent only root nodes (those with parentId: null)
     return child.map(vnode => ({
       ...vnode,
       parentId: vnode.parentId === null ? parentId : vnode.parentId,
@@ -90,7 +62,8 @@ function processChild(child: JSXChild, parentId: string | null, index: number): 
   }
 
   if (Array.isArray(child)) {
-    return processChildren(child, parentId)
+    const collections = child.map((item, i) => processChild(item, parentId, i))
+    return Collection.concat(...collections)
   }
 
   return Collection.from<VNode>([])

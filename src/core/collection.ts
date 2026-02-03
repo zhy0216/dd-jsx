@@ -4,12 +4,14 @@ type Subscriber<T> = (item: T, delta: Delta) => void
 
 export class Collection<T> {
   protected subscribers: Set<Subscriber<T>> = new Set()
-  protected data: T[] = []
+  protected data: T[]
+
+  constructor(initialData: T[] = []) {
+    this.data = initialData
+  }
 
   static from<T>(items: T[]): Collection<T> {
-    const col = new Collection<T>()
-    col.data = [...items]
-    return col
+    return new Collection<T>([...items])
   }
 
   static concat<T>(...collections: Collection<T>[]): Collection<T> {

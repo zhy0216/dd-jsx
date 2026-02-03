@@ -2,16 +2,13 @@ import { Collection } from './collection'
 import { Delta } from './delta'
 import { scheduleEmit } from './tx'
 
-type Subscriber<T> = (item: T, delta: Delta) => void
-
 export class Input<T> extends Collection<T> {
   private values: Set<T> = new Set()
 
   constructor(initial?: T) {
-    super()
+    super(initial !== undefined ? [initial] : [])
     if (initial !== undefined) {
       this.values.add(initial)
-      ;(this as any).data = [initial]
     }
   }
 

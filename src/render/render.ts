@@ -7,7 +7,7 @@ type Disposable = {
 }
 
 type RendererState = {
-  elements: Map<string, HTMLElement | Text>
+  elements: Map<string, Node>
   vnodes: Map<string, VNode>
   container: HTMLElement
   document: Document
@@ -51,18 +51,14 @@ function handleInsert(vnode: VNode, state: RendererState): void {
 
 function handleRetract(vnode: VNode, state: RendererState): void {
   const el = state.elements.get(vnode.id)
-  if (el) {
-    if ((el as HTMLElement).remove) {
-      (el as HTMLElement).remove()
-    } else if (el.parentElement) {
-      el.parentElement.removeChild(el)
-    }
-    state.elements.delete(vnode.id)
-    state.vnodes.delete(vnode.id)
-  }
+  if (!el) return
+
+  (el as ChildNode).remove()
+  state.elements.delete(vnode.id)
+  state.vnodes.delete(vnode.id)
 }
 
-function createElement(vnode: VNode, state: RendererState): HTMLElement | Text {
+function createElement(vnode: VNode, state: RendererState): Node {
   if (vnode.tag === '#text') {
     return state.document.createTextNode(vnode.text ?? '')
   }
@@ -84,13 +80,12 @@ function createElement(vnode: VNode, state: RendererState): HTMLElement | Text {
   return el
 }
 
-function attachToParent(el: HTMLElement | Text, vnode: VNode, state: RendererState): void {
+function attachToParent(el: Node, vnode: VNode, state: RendererState): void {
   const parent = vnode.parentId
     ? state.elements.get(vnode.parentId)
     : state.container
 
   if (parent) {
-    // Simple append for now - sibling ordering can be improved later
-    (parent as HTMLElement).appendChild(el as any)
+    parent.appendChild(el)
   }
 }
