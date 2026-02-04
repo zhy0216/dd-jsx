@@ -47,11 +47,23 @@ function handleInsert(vnode: VNode, state: RendererState): void {
   state.elements.set(vnode.id, el)
   state.vnodes.set(vnode.id, vnode)
   attachToParent(el, vnode, state)
+
+  // Call ref callback with element
+  const ref = vnode.props.ref
+  if (typeof ref === 'function') {
+    ref(el)
+  }
 }
 
 function handleRetract(vnode: VNode, state: RendererState): void {
   const el = state.elements.get(vnode.id)
   if (!el) return
+
+  // Call ref callback with null
+  const ref = vnode.props.ref
+  if (typeof ref === 'function') {
+    ref(null)
+  }
 
   (el as ChildNode).remove()
   state.elements.delete(vnode.id)
@@ -68,6 +80,7 @@ function createElement(vnode: VNode, state: RendererState): Node {
   // Set attributes
   for (const [key, value] of Object.entries(vnode.props)) {
     if (key === 'key') continue
+    if (key === 'ref') continue  // Don't set ref as attribute
     if (key.startsWith('on')) {
       // Event handler
       const event = key.slice(2).toLowerCase()
