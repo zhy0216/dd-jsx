@@ -4,6 +4,16 @@ import { VNode } from '../vnode/types'
 // Ref callback type
 export type RefCallback<T extends Element> = (element: T | null) => void
 
+// Valid children types for JSX elements
+export type Child =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | Collection<VNode>
+  | Child[]
+
 // Base attributes shared by all HTML elements
 export interface BaseHTMLAttributes<T extends Element> {
   ref?: RefCallback<T>
@@ -14,6 +24,7 @@ export interface BaseHTMLAttributes<T extends Element> {
   title?: string
   tabIndex?: number
   hidden?: boolean
+  children?: Child
   // Event handlers
   onClick?: (e: MouseEvent) => void
   onDblClick?: (e: MouseEvent) => void

@@ -42,6 +42,30 @@ export class Input<T> extends Collection<T> {
     }
   }
 
+  /** Get current value (first item in collection) */
+  get(): T | undefined {
+    return [...this.values][0]
+  }
+
+  /** Get all current values */
+  getAll(): T[] {
+    return [...this.values]
+  }
+
+  /** Find an item matching a predicate */
+  find(predicate: (item: T) => boolean): T | undefined {
+    for (const v of this.values) {
+      if (predicate(v)) return v
+    }
+    return undefined
+  }
+
+  /** Replace an item (retract old, insert new) */
+  replace(oldValue: T, newValue: T): void {
+    this.retract(oldValue)
+    this.insert(newValue)
+  }
+
   protected emit(item: T, delta: Delta): void {
     scheduleEmit(() => {
       for (const fn of this.subscribers) {

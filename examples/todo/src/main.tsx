@@ -1,4 +1,4 @@
-import { render, input, Input, Collection } from 'dd-jsx'
+import { render, input } from 'dd-jsx'
 
 type Todo = {
   id: string
@@ -6,12 +6,9 @@ type Todo = {
   completed: boolean
 }
 
-// State
-const todos = input<Todo[]>([])
+// State - collection of individual todos (not an array)
+const todos = input<Todo>()
 const newTodoText = input('')
-
-// Ref for input element
-let inputEl: HTMLInputElement | null = null
 
 // Generate unique ID
 let nextId = 1
@@ -19,135 +16,104 @@ function generateId(): string {
   return `todo-${nextId++}`
 }
 
-// Actions
+// Actions - delta-native operations
 function addTodo() {
-  const currentTodos = getCurrentValue(todos)
-  const text = getCurrentValue(newTodoText).trim()
-
+  const text = newTodoText.get()?.trim()
   if (!text) return
 
-  todos.set([
-    ...currentTodos,
-    { id: generateId(), text, completed: false }
-  ])
+  todos.insert({ id: generateId(), text, completed: false })
   newTodoText.set('')
-
-  // Clear the input using ref
-  if (inputEl) inputEl.value = ''
 }
 
-function toggleTodo(id: string) {
-  const currentTodos = getCurrentValue(todos)
-  todos.set(
-    currentTodos.map(todo =>
-      todo.id === id ? { ...todo, completed: !todo.completed } : todo
-    )
-  )
+function toggleTodo(todo: Todo) {
+  todos.replace(todo, { ...todo, completed: !todo.completed })
 }
 
-function deleteTodo(id: string) {
-  const currentTodos = getCurrentValue(todos)
-  todos.set(currentTodos.filter(todo => todo.id !== id))
+function deleteTodo(todo: Todo) {
+  todos.retract(todo)
 }
 
 function clearCompleted() {
-  const currentTodos = getCurrentValue(todos)
-  todos.set(currentTodos.filter(todo => !todo.completed))
+  for (const todo of todos.getAll()) {
+    if (todo.completed) {
+      todos.retract(todo)
+    }
+  }
 }
 
-// Helper to get current value from Input
-function getCurrentValue<T>(inp: Input<T>): T {
-  let value: T = undefined as T
-  const unsub = inp.subscribe((item) => {
-    value = item
-  })
-  unsub()
-  return value
+// Input form with reactive text binding
+function TodoInput() {
+  return newTodoText.flatMap(text => (
+    <div class="todo-input-container">
+      <input
+        class="todo-input"
+        type="text"
+        placeholder="What needs to be done?"
+        value={text}
+        onInput={(e: Event) => newTodoText.set((e.target as HTMLInputElement).value)}
+        onKeydown={(e: KeyboardEvent) => {
+          if (e.key === 'Enter') addTodo()
+        }}
+      />
+      <button class="add-btn" onClick={addTodo}>
+        Add
+      </button>
+    </div>
+  ))
 }
 
-// Components
-function TodoItem({ todo }: { todo: Todo }) {
-  return (
+function App() {
+  // FlatMap each todo to TodoItem VNodes
+  const todoItems = todos.flatMap(todo => (
     <div class={`todo-item ${todo.completed ? 'completed' : ''}`} key={todo.id}>
       <div
         class={`todo-checkbox ${todo.completed ? 'checked' : ''}`}
-        onClick={() => toggleTodo(todo.id)}
+        onClick={() => toggleTodo(todo)}
       >
         {todo.completed ? '✓' : ''}
       </div>
       <span class="todo-text">{todo.text}</span>
-      <button class="delete-btn" onClick={() => deleteTodo(todo.id)}>
+      <button class="delete-btn" onClick={() => deleteTodo(todo)}>
         Delete
       </button>
     </div>
-  )
-}
+  ))
 
-function TodoList({ todos: todoList }: { todos: Todo[] }) {
-  if (todoList.length === 0) {
+  // Derive footer stats reactively
+  const footer = todos.flatMap(() => {
+    const all = todos.getAll()
+    const remaining = all.filter(t => !t.completed).length
+    const hasCompleted = all.some(t => t.completed)
+    const total = all.length
+
+    if (total === 0) return <></>
+
     return (
-      <div class="empty-state">
-        No todos yet. Add one above!
+      <div class="todo-footer">
+        <span>{remaining} item{remaining !== 1 ? 's' : ''} left</span>
+        {hasCompleted ? (
+          <button class="clear-btn" onClick={clearCompleted}>
+            Clear completed
+          </button>
+        ) : (
+          <span></span>
+        )}
       </div>
     )
-  }
+  })
 
   return (
-    <div class="todo-list">
-      {todoList.map(todo => (
-        <TodoItem todo={todo} key={todo.id} />
-      ))}
-    </div>
-  )
-}
-
-function TodoFooter({ todos: todoList }: { todos: Todo[] }) {
-  const remaining = todoList.filter(t => !t.completed).length
-  const hasCompleted = todoList.some(t => t.completed)
-
-  if (todoList.length === 0) {
-    return <></>
-  }
-
-  return (
-    <div class="todo-footer">
-      <span>{remaining} item{remaining !== 1 ? 's' : ''} left</span>
-      {hasCompleted ? (
-        <button class="clear-btn" onClick={clearCompleted}>
-          Clear completed
-        </button>
-      ) : (
-        <span></span>
-      )}
-    </div>
-  )
-}
-
-function App() {
-  return todos.flatMap(todoList => (
     <div class="todo-container">
       <div class="todo-header">
         <h1>DD-JSX Todo</h1>
-        <div class="todo-input-container">
-          <input
-            ref={(el) => inputEl = el}
-            class="todo-input"
-            type="text"
-            placeholder="What needs to be done?"
-            onInput={(e: Event) => newTodoText.set((e.target as HTMLInputElement).value)}
-            onKeydown={(e: KeyboardEvent) => {
-              if (e.key === 'Enter') addTodo()
-            }}
-          />
-          <button class="add-btn" onClick={addTodo}>
-            Add
-          </button>
-        </div>
+        <TodoInput />
       </div>
-      <TodoList todos={todoList} />
-      <TodoFooter todos={todoList} />
+      <div class="todo-list">
+        {todoItems}
+      </div>
+      {footer}
     </div>
-  ))
+  )
 }
 
 // Mount
