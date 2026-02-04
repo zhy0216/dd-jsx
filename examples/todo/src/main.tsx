@@ -10,6 +10,9 @@ type Todo = {
 const todos = input<Todo[]>([])
 const newTodoText = input('')
 
+// Ref for input element
+let inputEl: HTMLInputElement | null = null
+
 // Generate unique ID
 let nextId = 1
 function generateId(): string {
@@ -29,9 +32,8 @@ function addTodo() {
   ])
   newTodoText.set('')
 
-  // Clear the input element directly since we don't use controlled value binding
-  const input = document.getElementById('todo-input') as HTMLInputElement
-  if (input) input.value = ''
+  // Clear the input using ref
+  if (inputEl) inputEl.value = ''
 }
 
 function toggleTodo(id: string) {
@@ -128,7 +130,7 @@ function App() {
         <h1>DD-JSX Todo</h1>
         <div class="todo-input-container">
           <input
-            id="todo-input"
+            ref={(el) => inputEl = el}
             class="todo-input"
             type="text"
             placeholder="What needs to be done?"
