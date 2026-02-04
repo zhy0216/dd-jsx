@@ -6,13 +6,15 @@ import { createTodoApp } from './app'
 describe('Todo App Integration', () => {
   let container: HTMLElement
   let app: ReturnType<typeof createTodoApp>
+  let flush: () => Promise<void>
 
   beforeEach(() => {
     document.body.innerHTML = ''
     container = document.createElement('div')
     document.body.appendChild(container)
     app = createTodoApp()
-    render(app.App(), container)
+    const result = render(app.App(), container)
+    flush = result.flush
   })
 
   it('renders initial empty state with header and no footer', () => {
@@ -37,13 +39,14 @@ describe('Todo App Integration', () => {
     expect(footers[0]?.textContent).toContain('1 item left')
   })
 
-  it('adds multiple todos and shows correct count', () => {
+  it('adds multiple todos and shows correct count', async () => {
     app.newTodoText.set('Buy milk')
     app.addTodo()
     app.newTodoText.set('Walk dog')
     app.addTodo()
     app.newTodoText.set('Do laundry')
     app.addTodo()
+    await flush()
 
     const todoItems = container.querySelectorAll('.todo-item')
     expect(todoItems.length).toBe(3)
@@ -53,7 +56,7 @@ describe('Todo App Integration', () => {
     expect(footers[0]?.textContent).toContain('3 items left')
   })
 
-  it('toggles a todo and updates state', () => {
+  it('toggles a todo and updates state', async () => {
     app.newTodoText.set('Buy milk')
     app.addTodo()
     app.newTodoText.set('Walk dog')
@@ -62,6 +65,7 @@ describe('Todo App Integration', () => {
     const allTodos = app.todos.getAll()
     const firstTodo = allTodos[0]
     app.toggleTodo(firstTodo)
+    await flush()
 
     const completedItem = container.querySelector('.todo-item.completed')
     expect(completedItem).not.toBeNull()
@@ -72,7 +76,7 @@ describe('Todo App Integration', () => {
     expect(container.querySelector('.clear-btn')).not.toBeNull()
   })
 
-  it('deletes a todo and updates the list', () => {
+  it('deletes a todo and updates the list', async () => {
     app.newTodoText.set('Buy milk')
     app.addTodo()
     app.newTodoText.set('Walk dog')
@@ -82,6 +86,7 @@ describe('Todo App Integration', () => {
 
     const allTodos = app.todos.getAll()
     app.deleteTodo(allTodos[0])
+    await flush()
 
     expect(container.querySelectorAll('.todo-item').length).toBe(1)
 
@@ -90,7 +95,7 @@ describe('Todo App Integration', () => {
     expect(footers[0]?.textContent).toContain('1 item left')
   })
 
-  it('clears completed todos', () => {
+  it('clears completed todos', async () => {
     app.newTodoText.set('Buy milk')
     app.addTodo()
     app.newTodoText.set('Walk dog')
@@ -101,6 +106,7 @@ describe('Todo App Integration', () => {
     const allTodos = app.todos.getAll()
     app.toggleTodo(allTodos[0])
     app.toggleTodo(allTodos[2])
+    await flush()
 
     expect(container.querySelectorAll('.todo-item.completed').length).toBe(2)
 
@@ -109,6 +115,7 @@ describe('Todo App Integration', () => {
     expect(footerBefore[0]?.textContent).toContain('1 item left')
 
     app.clearCompleted()
+    await flush()
 
     expect(container.querySelectorAll('.todo-item').length).toBe(1)
     expect(container.querySelectorAll('.todo-item.completed').length).toBe(0)

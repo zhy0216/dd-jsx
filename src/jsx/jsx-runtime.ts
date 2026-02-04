@@ -10,9 +10,15 @@ type JSXChild = string | number | Collection<VNode> | JSXChild[]
 
 export function jsx(
   tag: string | typeof Fragment | ((props: Props) => Collection<VNode>),
-  props: Props & { children?: JSXChild }
+  props: Props & { children?: JSXChild },
+  key?: string
 ): Collection<VNode> {
   const { children, ...restProps } = props
+
+  // Add key to props if provided as third argument
+  if (key !== undefined) {
+    restProps.key = key
+  }
 
   // Fragment: concatenate children
   if (tag === Fragment) {

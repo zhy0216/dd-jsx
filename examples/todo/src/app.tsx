@@ -57,8 +57,9 @@ export function createTodoApp() {
   // Input form with reactive text binding
   function TodoInput() {
     return newTodoText.flatMap(text => (
-      <div class="todo-input-container">
+      <div class="todo-input-container" key="todo-input-container">
         <input
+          key="todo-input"
           class="todo-input"
           type="text"
           placeholder="What needs to be done?"
@@ -68,7 +69,7 @@ export function createTodoApp() {
             if (e.key === 'Enter') addTodo()
           }}
         />
-        <button class="add-btn" onClick={addTodo}>
+        <button class="add-btn" key="todo-add-btn" onClick={addTodo}>
           Add
         </button>
       </div>
