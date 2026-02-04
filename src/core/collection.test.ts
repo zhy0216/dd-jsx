@@ -190,4 +190,149 @@ describe('Collection', () => {
       ])
     })
   })
+
+  describe('reduce', () => {
+    it('does not emit until first upstream delta (pure DD semantics)', () => {
+      const col = Collection.from<number>([])
+      const sum = col.reduce(0, (state, item, delta) => {
+        return state + (delta === Delta.Insert ? item : -item)
+      })
+      const changes: [number, Delta][] = []
+
+      sum.subscribe((item, delta) => {
+        changes.push([item, delta])
+      })
+
+      // No emissions yet - collection is empty
+      expect(changes).toEqual([])
+    })
+
+    it('emits on first upstream delta', () => {
+      const col = Collection.from<number>([])
+      const sum = col.reduce(0, (state, item, delta) => {
+        return state + (delta === Delta.Insert ? item : -item)
+      })
+      const changes: [number, Delta][] = []
+
+      sum.subscribe((item, delta) => {
+        changes.push([item, delta])
+      })
+
+      ;(col as any).emit(5, Delta.Insert)
+
+      expect(changes).toEqual([[5, Delta.Insert]])
+    })
+
+    it('emits retract then insert when state changes', () => {
+      const col = Collection.from<number>([])
+      const sum = col.reduce(0, (state, item, delta) => {
+        return state + (delta === Delta.Insert ? item : -item)
+      })
+      const changes: [number, Delta][] = []
+
+      sum.subscribe((item, delta) => {
+        changes.push([item, delta])
+      })
+
+      ;(col as any).emit(5, Delta.Insert)
+      ;(col as any).emit(3, Delta.Insert)
+
+      expect(changes).toEqual([
+        [5, Delta.Insert],
+        [5, Delta.Retract],
+        [8, Delta.Insert]
+      ])
+    })
+
+    it('handles retractions correctly', () => {
+      const col = Collection.from<number>([])
+      const sum = col.reduce(0, (state, item, delta) => {
+        return state + (delta === Delta.Insert ? item : -item)
+      })
+      const changes: [number, Delta][] = []
+
+      sum.subscribe((item, delta) => {
+        changes.push([item, delta])
+      })
+
+      ;(col as any).emit(5, Delta.Insert)
+      ;(col as any).emit(3, Delta.Insert)
+      ;(col as any).emit(5, Delta.Retract)
+
+      expect(changes).toEqual([
+        [5, Delta.Insert],
+        [5, Delta.Retract],
+        [8, Delta.Insert],
+        [8, Delta.Retract],
+        [3, Delta.Insert]
+      ])
+    })
+
+    it('works with object state (count example)', () => {
+      type Item = { completed: boolean }
+      const col = Collection.from<Item>([])
+      const counts = col.reduce(
+        { total: 0, completedCount: 0 },
+        (state, item, delta) => {
+          const mult = delta === Delta.Insert ? 1 : -1
+          return {
+            total: state.total + mult,
+            completedCount: state.completedCount + (item.completed ? mult : 0)
+          }
+        }
+      )
+
+      const states: { total: number; completedCount: number }[] = []
+      counts.subscribe((item, delta) => {
+        if (delta === Delta.Insert) states.push(item)
+      })
+
+      ;(col as any).emit({ completed: false }, Delta.Insert)
+      ;(col as any).emit({ completed: true }, Delta.Insert)
+      ;(col as any).emit({ completed: false }, Delta.Insert)
+
+      expect(states).toEqual([
+        { total: 1, completedCount: 0 },
+        { total: 2, completedCount: 1 },
+        { total: 3, completedCount: 1 }
+      ])
+    })
+
+    it('late subscriber gets current state', () => {
+      const col = Collection.from<number>([])
+      const sum = col.reduce(0, (state, item, delta) => {
+        return state + (delta === Delta.Insert ? item : -item)
+      })
+
+      // First subscriber
+      sum.subscribe(() => {})
+
+      // Emit some values
+      ;(col as any).emit(5, Delta.Insert)
+      ;(col as any).emit(3, Delta.Insert)
+
+      // Late subscriber should get current state
+      const lateChanges: [number, Delta][] = []
+      sum.subscribe((item, delta) => {
+        lateChanges.push([item, delta])
+      })
+
+      expect(lateChanges).toEqual([[8, Delta.Insert]])
+    })
+
+    it('works with initial data in collection', () => {
+      const col = Collection.from([1, 2, 3])
+      const sum = col.reduce(0, (state, item, delta) => {
+        return state + (delta === Delta.Insert ? item : -item)
+      })
+
+      const states: number[] = []
+      sum.subscribe((item, delta) => {
+        if (delta === Delta.Insert) states.push(item)
+      })
+
+      // Should have processed all initial values
+      expect(states).toEqual([1, 3, 6])
+    })
+  })
 })

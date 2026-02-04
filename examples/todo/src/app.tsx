@@ -1,4 +1,4 @@
-import { input } from 'dd-jsx'
+import { input, Delta } from 'dd-jsx'
 
 export type Todo = {
   id: string
@@ -6,34 +6,28 @@ export type Todo = {
   completed: boolean
 }
 
-type FooterState = {
-  total: number
-  remaining: number
-  hasCompleted: boolean
-}
-
 export function createTodoApp() {
   // State - collection of individual todos (not an array)
   const todos = input<Todo>()
   const newTodoText = input('')
-  // Single-value state for footer (avoids one-footer-per-todo issue)
-  const footerState = input<FooterState>({ total: 0, remaining: 0, hasCompleted: false })
+
+  // Derived state via reduce (incremental delta-based aggregation)
+  const footerState = todos.reduce(
+    { total: 0, completedCount: 0 },
+    (state, todo, delta) => {
+      const mult = delta === Delta.Insert ? 1 : -1
+      return {
+        total: state.total + mult,
+        completedCount: state.completedCount + (todo.completed ? mult : 0)
+      }
+    }
+  )
 
   // Generate unique ID
   let nextId = 1
   function generateId(): string {
     return `todo-${nextId++}`
   }
-
-  // Auto-sync footer state whenever todos changes
-  todos.subscribe(() => {
-    const all = todos.getAll()
-    footerState.set({
-      total: all.length,
-      remaining: all.filter(t => !t.completed).length,
-      hasCompleted: all.some(t => t.completed)
-    })
-  })
 
   // Actions - delta-native operations
   function addTodo() {
@@ -98,9 +92,11 @@ export function createTodoApp() {
       </div>
     ))
 
-    // Derive footer from single-value footerState
-    const footer = footerState.flatMap(({ total, remaining, hasCompleted }) => {
+    // Derive footer from reduced state
+    const footer = footerState.flatMap(({ total, completedCount }) => {
       if (total === 0) return <></>
+      const remaining = total - completedCount
+      const hasCompleted = completedCount > 0
 
       return (
         <div class="todo-footer">

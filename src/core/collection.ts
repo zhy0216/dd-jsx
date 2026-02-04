@@ -60,6 +60,13 @@ export class Collection<T> {
   ): Collection<[T, U]> {
     return new JoinCollection(this, other, keyA, keyB)
   }
+
+  reduce<S>(
+    initial: S,
+    fn: (state: S, item: T, delta: Delta) => S
+  ): Collection<S> {
+    return new ReduceCollection(this, initial, fn)
+  }
 }
 
 class MappedCollection<T, U> extends Collection<U> {
@@ -327,6 +334,47 @@ class JoinCollection<T, U, K> extends Collection<[T, U]> {
       this.subscribers.delete(fn)
       unsubA()
       unsubB()
+    }
+  }
+}
+
+class ReduceCollection<T, S> extends Collection<S> {
+  private state: S
+  private hasEmitted = false
+
+  constructor(
+    private upstream: Collection<T>,
+    private initial: S,
+    private reduceFn: (state: S, item: T, delta: Delta) => S
+  ) {
+    super()
+    this.state = initial
+  }
+
+  subscribe(fn: Subscriber<S>): () => void {
+    this.subscribers.add(fn)
+
+    // Late subscriber gets current state (if any)
+    if (this.hasEmitted) {
+      fn(this.state, Delta.Insert)
+    }
+
+    const unsub = this.upstream.subscribe((item, delta) => {
+      const oldState = this.state
+      const newState = this.reduceFn(oldState, item, delta)
+
+      if (this.hasEmitted) {
+        this.emit(oldState, Delta.Retract)
+      }
+
+      this.state = newState
+      this.emit(newState, Delta.Insert)
+      this.hasEmitted = true
+    })
+
+    return () => {
+      this.subscribers.delete(fn)
+      unsub()
     }
   }
 }
