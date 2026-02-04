@@ -1,4 +1,4 @@
-import { render, input, Input, Collection, tx } from 'dd-jsx'
+import { render, input, Input, Collection } from 'dd-jsx'
 
 type Todo = {
   id: string
@@ -20,16 +20,18 @@ function generateId(): string {
 function addTodo() {
   const currentTodos = getCurrentValue(todos)
   const text = getCurrentValue(newTodoText).trim()
-  
+
   if (!text) return
-  
-  tx(() => {
-    todos.set([
-      ...currentTodos,
-      { id: generateId(), text, completed: false }
-    ])
-    newTodoText.set('')
-  })
+
+  todos.set([
+    ...currentTodos,
+    { id: generateId(), text, completed: false }
+  ])
+  newTodoText.set('')
+
+  // Clear the input element directly since we don't use controlled value binding
+  const input = document.getElementById('todo-input') as HTMLInputElement
+  if (input) input.value = ''
 }
 
 function toggleTodo(id: string) {
@@ -124,23 +126,21 @@ function App() {
     <div class="todo-container">
       <div class="todo-header">
         <h1>DD-JSX Todo</h1>
-        {newTodoText.flatMap(text => (
-          <div class="todo-input-container">
-            <input
-              class="todo-input"
-              type="text"
-              placeholder="What needs to be done?"
-              value={text}
-              onInput={(e: Event) => newTodoText.set((e.target as HTMLInputElement).value)}
-              onKeydown={(e: KeyboardEvent) => {
-                if (e.key === 'Enter') addTodo()
-              }}
-            />
-            <button class="add-btn" onClick={addTodo}>
-              Add
-            </button>
-          </div>
-        ))}
+        <div class="todo-input-container">
+          <input
+            id="todo-input"
+            class="todo-input"
+            type="text"
+            placeholder="What needs to be done?"
+            onInput={(e: Event) => newTodoText.set((e.target as HTMLInputElement).value)}
+            onKeydown={(e: KeyboardEvent) => {
+              if (e.key === 'Enter') addTodo()
+            }}
+          />
+          <button class="add-btn" onClick={addTodo}>
+            Add
+          </button>
+        </div>
       </div>
       <TodoList todos={todoList} />
       <TodoFooter todos={todoList} />
