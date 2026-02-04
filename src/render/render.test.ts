@@ -101,4 +101,60 @@ describe('render', () => {
     ;(vnodes as any).emit(vnode, Delta.Retract)
     expect(container.children.length).toBe(0)
   })
+
+  it('calls ref callback with element on insert', () => {
+    const container = new MockElement('div')
+    const doc = createMockDocument()
+
+    let refElement: any = null
+    const vnode = createVNode({
+      tag: 'div',
+      props: { ref: (el: any) => { refElement = el } }
+    })
+
+    const vnodes = Collection.from([vnode])
+    render(vnodes, container as any, doc as any)
+
+    expect(refElement).not.toBeNull()
+    expect(refElement.tagName).toBe('DIV')
+  })
+
+  it('calls ref callback with null on retract', () => {
+    const container = new MockElement('div')
+    const doc = createMockDocument()
+
+    let refElement: any = 'not-called'
+    const vnode = createVNode({
+      tag: 'div',
+      props: { ref: (el: any) => { refElement = el } }
+    })
+
+    const vnodes = Collection.from<VNode>([])
+    render(vnodes, container as any, doc as any)
+
+    // Insert
+    ;(vnodes as any).emit(vnode, Delta.Insert)
+    expect(refElement).not.toBeNull()
+    expect(refElement.tagName).toBe('DIV')
+
+    // Retract
+    ;(vnodes as any).emit(vnode, Delta.Retract)
+    expect(refElement).toBeNull()
+  })
+
+  it('does not set ref as DOM attribute', () => {
+    const container = new MockElement('div')
+    const doc = createMockDocument()
+
+    const vnode = createVNode({
+      tag: 'div',
+      props: { ref: () => {}, class: 'test' }
+    })
+
+    const vnodes = Collection.from([vnode])
+    render(vnodes, container as any, doc as any)
+
+    expect(container.children[0].attributes.get('class')).toBe('test')
+    expect(container.children[0].attributes.has('ref')).toBe(false)
+  })
 })
