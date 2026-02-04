@@ -14,11 +14,13 @@ export class Input<T> extends Collection<T> {
 
   insert(value: T): void {
     this.values.add(value)
+    this.data = [...this.values]
     this.emit(value, Delta.Insert)
   }
 
   retract(value: T): void {
     this.values.delete(value)
+    this.data = [...this.values]
     this.emit(value, Delta.Retract)
   }
 
