@@ -1,6 +1,6 @@
 # DD-JSX
 
-A frontend framework built on **[differential dataflow](https://github.com/TimelyDataflow/differential-dataflow)**.
+A frontend framework built on **[differential dataflow](https://github.com/electric-sql/d2ts)**.
 
 ## What is Differential Dataflow?
 
