@@ -6,16 +6,34 @@ export type Todo = {
   completed: boolean
 }
 
+type FooterState = {
+  total: number
+  remaining: number
+  hasCompleted: boolean
+}
+
 export function createTodoApp() {
   // State - collection of individual todos (not an array)
   const todos = input<Todo>()
   const newTodoText = input('')
+  // Single-value state for footer (avoids one-footer-per-todo issue)
+  const footerState = input<FooterState>({ total: 0, remaining: 0, hasCompleted: false })
 
   // Generate unique ID
   let nextId = 1
   function generateId(): string {
     return `todo-${nextId++}`
   }
+
+  // Auto-sync footer state whenever todos changes
+  todos.subscribe(() => {
+    const all = todos.getAll()
+    footerState.set({
+      total: all.length,
+      remaining: all.filter(t => !t.completed).length,
+      hasCompleted: all.some(t => t.completed)
+    })
+  })
 
   // Actions - delta-native operations
   function addTodo() {
@@ -80,13 +98,8 @@ export function createTodoApp() {
       </div>
     ))
 
-    // Derive footer stats reactively
-    const footer = todos.flatMap(() => {
-      const all = todos.getAll()
-      const remaining = all.filter(t => !t.completed).length
-      const hasCompleted = all.some(t => t.completed)
-      const total = all.length
-
+    // Derive footer from single-value footerState
+    const footer = footerState.flatMap(({ total, remaining, hasCompleted }) => {
       if (total === 0) return <></>
 
       return (
