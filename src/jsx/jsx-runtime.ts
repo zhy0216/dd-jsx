@@ -1,5 +1,8 @@
 import { Collection } from '../core/collection'
 import { VNode, Props, createVNode } from '../vnode/types'
+import './types'
+export { createRef } from './types'
+export type { RefCallback, BaseHTMLAttributes, InputHTMLAttributes } from './types'
 
 export const Fragment = Symbol('Fragment')
 
