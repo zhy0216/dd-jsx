@@ -51,7 +51,11 @@ function handleInsert(vnode: VNode, state: RendererState): void {
   // Call ref callback with element
   const ref = vnode.props.ref
   if (typeof ref === 'function') {
-    ref(el)
+    try {
+      ref(el)
+    } catch (e) {
+      console.error('Error in ref callback during insert:', e)
+    }
   }
 }
 
@@ -62,7 +66,11 @@ function handleRetract(vnode: VNode, state: RendererState): void {
   // Call ref callback with null
   const ref = vnode.props.ref
   if (typeof ref === 'function') {
-    ref(null)
+    try {
+      ref(null)
+    } catch (e) {
+      console.error('Error in ref callback during retract:', e)
+    }
   }
 
   (el as ChildNode).remove()

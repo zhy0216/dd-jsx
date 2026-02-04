@@ -188,6 +188,9 @@ declare global {
       // SVG (basic support)
       svg: BaseHTMLAttributes<SVGSVGElement> & { viewBox?: string; xmlns?: string }
       path: BaseHTMLAttributes<SVGPathElement> & { d?: string; fill?: string; stroke?: string }
+
+      // Catch-all for unlisted elements
+      [elemName: string]: any
     }
   }
 }
