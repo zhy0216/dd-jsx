@@ -143,6 +143,37 @@ describe('Collection', () => {
 
       expect(values).toEqual([[1, 10], [2, 10], [3, 10]])
     })
+
+    it('re-emits all items when the latest side changes', () => {
+      const { Input } = require('./input')
+      const items = new Input<number>()
+      const context = new Input<string>()
+      const combined = items.withLatest(context)
+
+      const current: Map<number, [number, string]> = new Map()
+
+      combined.subscribe(([item, ctx], delta) => {
+        if (delta === Delta.Insert) {
+          current.set(item, [item, ctx])
+        } else {
+          current.delete(item)
+        }
+      })
+
+      // Set initial context
+      context.set('v1')
+
+      // Add items
+      items.insert(1)
+      items.insert(2)
+      expect(current.get(1)).toEqual([1, 'v1'])
+      expect(current.get(2)).toEqual([2, 'v1'])
+
+      // Change context - all items should re-emit with new context
+      context.set('v2')
+      expect(current.get(1)).toEqual([1, 'v2'])
+      expect(current.get(2)).toEqual([2, 'v2'])
+    })
   })
 
   describe('filterBy', () => {
