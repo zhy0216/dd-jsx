@@ -211,10 +211,15 @@ export function createExcelApp() {
     const cellData = cells.filter(c => c.col === col && c.row === row)
 
     // Re-render when either selection state changes OR cell data changes
-    // Use 'void' trigger - we read actual state imperatively
-    const stateTrigger = cellState.map(() => 'state' as string)
-    const dataTrigger = cellData.map(() => 'data' as string)
-    const trigger = Collection.concat(stateTrigger, dataTrigger)
+    // Use withLatest to combine cellState with a data version counter
+    // The counter increments on any cell data change, causing re-render
+    const cellDataVersion = input(0)
+    cellData.subscribe((_, delta) => {
+      if (delta === Delta.Insert) {
+        cellDataVersion.set(cellDataVersion.get()! + 1)
+      }
+    })
+    const trigger = cellState.withLatest(cellDataVersion)
 
     return trigger.flatMap(() => {
       // Read current state imperatively

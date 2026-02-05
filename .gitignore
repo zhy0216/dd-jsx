@@ -12,3 +12,4 @@ examples/**/*.js
 .idea/
 .vscode/
 *.swp
+.playwright-mcp
