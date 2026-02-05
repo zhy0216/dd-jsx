@@ -116,6 +116,18 @@ const feed = users.join(posts, u => u.id, p => p.authorId)
 const items = todos.flatMap(todo => <TodoItem todo={todo} />)
 ```
 
+**Global context without prop drilling.** The `Context` function creates reactive global state that auto-injects into operators:
+
+```tsx
+const user = new Input({ name: 'Alice', theme: 'dark' })
+const ctx = Context({ user })
+
+// ctx.user is reactive - when it changes, items re-emit
+const items = todos.flatMap(todo => (
+  <div class={ctx.user.theme}>{todo.text}</div>
+))
+```
+
 **O(1) aggregation.** The `reduce` operator maintains aggregates incrementally as items insert/retract:
 
 ```tsx
@@ -152,7 +164,7 @@ tx(() => {
 ## Quick Start
 
 ```tsx
-import { input, render } from 'dd-jsx'
+import { input, render, Input, Context } from 'dd-jsx'
 
 const count = input(0)
 
@@ -167,6 +179,42 @@ function App() {
 render(<App />, document.getElementById('app')!)
 ```
 
+## Context
+
+When you need shared state across multiple collections (user session, theme, feature flags), use `Context`:
+
+```tsx
+import { Input, Context } from 'dd-jsx'
+
+// Create inputs for your global state
+const user = new Input({ id: 1, name: 'Alice', role: 'admin' })
+const settings = new Input({ theme: 'dark', language: 'en' })
+
+// Create context - automatically registers for injection
+const ctx = Context({ user, settings })
+
+// Access ctx.user and ctx.settings inside any operator
+// When inputs change, dependent operators re-emit
+const header = items.flatMap(item => (
+  <div class={ctx.settings.theme}>
+    Welcome, {ctx.user.name}!
+    <span>{item.title}</span>
+  </div>
+))
+
+// Cleanup when done
+ctx.dispose()
+```
+
+**How it works:**
+
+1. `Context({ user, settings })` combines inputs into a single reactive collection
+2. Operators like `flatMap` automatically detect registered contexts
+3. When any context input changes, the operator re-processes all items with the new values
+4. `ctx.user` provides synchronous access to the current value inside callbacks
+
+This replaces the need for explicit `withLatest` chains when you have global state.
+
 ## Operators
 
 All operators are incremental—they process deltas, not full collections.
@@ -177,10 +225,11 @@ All operators are incremental—they process deltas, not full collections.
 | `filter` | Pass matching deltas |
 | `flatMap` | Map to collection, flatten deltas (the workhorse for reactive UI) |
 | `join` | Relational join—emits deltas when either side changes |
-| `withLatest` | Pair deltas with latest value from another collection |
+| `withLatest` | Pair deltas with latest value from another collection (re-emits when latest changes) |
 | `filterBy` | Filter using a reactive predicate collection |
 | `reduce` | Incremental aggregation over all deltas |
 | `concat` | Merge delta streams |
+| `Context` | Create reactive global state that auto-injects into operators |
 
 ## TypeScript Config
 
