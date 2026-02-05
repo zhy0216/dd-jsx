@@ -30,6 +30,74 @@ type JSX.Element = Collection<VNode>
 
 The DOM renderer subscribes to a stream of VNode deltas and applies them directly. No virtual DOM diffing—changes flow through as deltas and become DOM mutations.
 
+## Data Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Application                             │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Input<T>                                                       │
+│  ─────────                                                      │
+│  Mutable state containers                                       │
+│                                                                 │
+│  insert(value)  ──────────────────────────▶  [value, Insert]    │
+│  retract(value) ──────────────────────────▶  [value, Retract]   │
+│  update(fn)     ──────────────────────────▶  [old, -1], [new, 1]│
+└─────────────────────────────────────────────────────────────────┘
+                               │
+                          emit deltas
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Collection Operators                                           │
+│  ────────────────────                                           │
+│                                                                 │
+│  .map(fn)       Transform each value                            │
+│  .filter(fn)    Pass matching deltas                            │
+│  .flatMap(fn)   Map to collection, flatten (reactive UI)        │
+│  .join(...)     Relational join on keys                         │
+│  .reduce(...)   Incremental aggregation                         │
+│                                                                 │
+│  Each operator processes deltas incrementally                   │
+│  Work ∝ size of change, not size of data                        │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+                        transform deltas
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Collection<VNode>                                              │
+│  ─────────────────                                              │
+│                                                                 │
+│  VNodes are flat relational data:                               │
+│  { id, parentId, index, tag, props, text? }                     │
+│                                                                 │
+│  Tree structure assembled at render time via parentId           │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+                           subscribe
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Renderer                                                       │
+│  ────────                                                       │
+│                                                                 │
+│  [VNode, Insert]  ──────────────────────▶  createElement()      │
+│  [VNode, Retract] ──────────────────────▶  removeChild()        │
+│  [props changed]  ──────────────────────▶  setAttribute()       │
+│                                                                 │
+│  Direct DOM mutations from deltas — no diffing                  │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                            DOM                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ## Why This Matters for UI
 
 **Incremental by default.** When one todo item changes, only that item's delta flows through the pipeline—not the entire list.
