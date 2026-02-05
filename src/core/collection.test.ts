@@ -366,4 +366,76 @@ describe('Collection', () => {
       expect(states).toEqual([1, 3, 6])
     })
   })
+
+  describe('distinct', () => {
+    it('only emits when value changes (using JSON comparison)', () => {
+      const input = new Input<{ x: number }>()
+      const distinct = input.distinct()
+      const changes: [{ x: number }, Delta][] = []
+
+      distinct.subscribe((item, delta) => {
+        changes.push([item, delta])
+      })
+
+      input.set({ x: 1 })
+      input.set({ x: 1 })  // same value, should not emit
+      input.set({ x: 2 })  // different value, should emit
+      input.set({ x: 2 })  // same value, should not emit
+
+      expect(changes).toEqual([
+        [{ x: 1 }, Delta.Insert],
+        [{ x: 1 }, Delta.Retract],
+        [{ x: 2 }, Delta.Insert]
+      ])
+    })
+
+    it('only emits when derived key changes', () => {
+      const input = new Input<{ col: number; row: number; other: string }>()
+      // Only care about col and row, not other
+      const distinct = input.distinct(item => `${item.col}:${item.row}`)
+      const changes: [{ col: number; row: number; other: string }, Delta][] = []
+
+      distinct.subscribe((item, delta) => {
+        changes.push([item, delta])
+      })
+
+      input.set({ col: 0, row: 0, other: 'a' })
+      input.set({ col: 0, row: 0, other: 'b' })  // same key, should not emit
+      input.set({ col: 1, row: 0, other: 'c' })  // different key, should emit
+
+      expect(changes).toEqual([
+        [{ col: 0, row: 0, other: 'a' }, Delta.Insert],
+        [{ col: 0, row: 0, other: 'a' }, Delta.Retract],
+        [{ col: 1, row: 0, other: 'c' }, Delta.Insert]
+      ])
+    })
+
+    it('prevents redundant re-renders in withLatest chains', () => {
+      const items = new Input<number>()
+      const selection = new Input<number | null>()
+
+      // Simulates per-cell selection state: only re-emit when THIS cell's selection changes
+      const cellIsSelected = selection
+        .map(sel => sel === 1)  // Is cell 1 selected?
+        .distinct()
+
+      const changes: [boolean, Delta][] = []
+      cellIsSelected.subscribe((item, delta) => {
+        changes.push([item, delta])
+      })
+
+      selection.set(null)   // false
+      selection.set(2)      // still false for cell 1
+      selection.set(3)      // still false for cell 1
+      selection.set(1)      // now true for cell 1
+      selection.set(1)      // still true
+
+      // Should only have 2 state changes: null->false->true
+      expect(changes).toEqual([
+        [false, Delta.Insert],
+        [false, Delta.Retract],
+        [true, Delta.Insert]
+      ])
+    })
+  })
 })

@@ -352,4 +352,32 @@ describe('Excel App Integration', () => {
     const sumCells = summaryRow?.querySelectorAll('.cell-content')
     expect(sumCells?.[0]?.textContent).toBe('30')
   })
+
+  it('only re-renders affected cells on selection change', async () => {
+    await flush()
+
+    // Reset render counts
+    app.resetRenderCounts()
+
+    // Select cell A1 (0,0)
+    app.selectCell(0, 0)
+    await flush()
+
+    // Get render counts after first selection
+    const countsAfterFirst = new Map(app.renderCounts)
+
+    // Reset and select a different cell B2 (1,1)
+    app.resetRenderCounts()
+    app.selectCell(1, 1)
+    await flush()
+
+    // Count how many cells re-rendered
+    let rerenderedCells = 0
+    app.renderCounts.forEach((count) => {
+      if (count > 0) rerenderedCells++
+    })
+
+    // Only 2 cells should re-render: the old selected (0,0) and new selected (1,1)
+    expect(rerenderedCells).toBe(2)
+  })
 })

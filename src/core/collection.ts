@@ -72,6 +72,10 @@ export class Collection<T> {
   ): Collection<S> {
     return new ReduceCollection(this, initial, fn)
   }
+
+  distinct<K = T>(keyFn?: (item: T) => K): Collection<T> {
+    return new DistinctCollection(this, keyFn)
+  }
 }
 
 class MappedCollection<T, U> extends Collection<U> {
@@ -536,6 +540,63 @@ class ReduceCollection<T, S> extends Collection<S> {
       this.state = newState
       this.emit(newState, Delta.Insert)
       this.hasEmitted = true
+    })
+
+    return () => {
+      this.subscribers.delete(fn)
+      unsub()
+    }
+  }
+}
+
+/**
+ * Distinct collection that only emits when the value (or derived key) changes.
+ * For single-value streams (like Input), this prevents redundant re-renders
+ * when the logical state hasn't changed.
+ *
+ * Note: This ignores upstream retracts and only compares on inserts.
+ * This works correctly with Input.set() which emits retract+insert pairs.
+ */
+class DistinctCollection<T, K> extends Collection<T> {
+  private lastKey: K | undefined
+  private lastItem: T | undefined
+  private hasEmitted = false
+
+  constructor(
+    private upstream: Collection<T>,
+    private keyFn: ((item: T) => K) | undefined
+  ) {
+    super()
+  }
+
+  private getKey(item: T): K {
+    if (this.keyFn) {
+      return this.keyFn(item)
+    }
+    // Default: use JSON.stringify for deep comparison
+    return JSON.stringify(item) as unknown as K
+  }
+
+  subscribe(fn: Subscriber<T>): () => void {
+    this.subscribers.add(fn)
+
+    const unsub = this.upstream.subscribe((item, delta) => {
+      if (delta === Delta.Insert) {
+        const key = this.getKey(item)
+        // Only emit if the key changed from what we last emitted
+        if (!this.hasEmitted || key !== this.lastKey) {
+          // Retract previous value if we had one
+          if (this.hasEmitted && this.lastItem !== undefined) {
+            this.emit(this.lastItem, Delta.Retract)
+          }
+          this.lastKey = key
+          this.lastItem = item
+          this.hasEmitted = true
+          this.emit(item, Delta.Insert)
+        }
+      }
+      // Ignore upstream retracts - we emit our own retract when value changes
+      // This works with Input.set() which always follows retract with insert
     })
 
     return () => {

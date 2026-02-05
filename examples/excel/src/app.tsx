@@ -196,21 +196,41 @@ export function createExcelApp() {
   }
 
   function GridCell(col: number, row: number) {
-    // Combine cell data with selection and editing state
-    const cellData = cells.filter(c => c.col === col && c.row === row)
-    const combined = selection.withLatest(isEditing)
+    const key = cellKey(col, row)
 
-    return combined.flatMap(([sel, editing]) => {
-      const isSelected = sel?.col === col && sel?.row === row
-      const isEditingThis = isSelected && editing
-      const key = cellKey(col, row)
+    // Derive this cell's specific selection and editing state
+    // Use distinct() so we only re-render when THIS cell's state changes
+    const cellState = selection.withLatest(isEditing)
+      .map(([sel, editing]) => ({
+        isSelected: sel?.col === col && sel?.row === row,
+        isEditing: sel?.col === col && sel?.row === row && editing
+      }))
+      .distinct()
+
+    // Cell data changes trigger re-render via cellData filter
+    const cellData = cells.filter(c => c.col === col && c.row === row)
+
+    // Re-render when either selection state changes OR cell data changes
+    // Use 'void' trigger - we read actual state imperatively
+    const stateTrigger = cellState.map(() => 'state' as string)
+    const dataTrigger = cellData.map(() => 'data' as string)
+    const trigger = Collection.concat(stateTrigger, dataTrigger)
+
+    return trigger.flatMap(() => {
+      // Read current state imperatively
+      const sel = selection.get()
+      const editing = isEditing.get()
+      const state = {
+        isSelected: sel?.col === col && sel?.row === row,
+        isEditing: sel?.col === col && sel?.row === row && editing
+      }
       const cell = cellMap.get(key)
 
       // Track render count for this cell
       const count = (renderCounts.get(key) ?? 0) + 1
       renderCounts.set(key, count)
 
-      if (isEditingThis) {
+      if (state.isEditing) {
         return editValue.flatMap(val => (
           <div
             class="grid-cell data-cell selected editing"
@@ -249,13 +269,13 @@ export function createExcelApp() {
 
       return (
         <div
-          class={`grid-cell data-cell ${isSelected ? 'selected' : ''}`}
+          class={`grid-cell data-cell ${state.isSelected ? 'selected' : ''}`}
           key={`cell-${col}-${row}`}
           data-render-count={count}
           onClick={() => selectCell(col, row)}
           onDblClick={() => startEditing()}
           onKeydown={(e: KeyboardEvent) => {
-            if (isSelected && !editing) {
+            if (state.isSelected && !state.isEditing) {
               if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
                 startEditing(e.key)
               } else if (e.key === 'Enter') {
@@ -282,7 +302,7 @@ export function createExcelApp() {
               }
             }
           }}
-          tabIndex={isSelected ? 0 : -1}
+          tabIndex={state.isSelected ? 0 : -1}
         >
           {count > 1 && <span class={`render-badge ${count > 5 ? 'high' : ''}`} key={`badge-${col}-${row}`}>{count}</span>}
           <div class={`cell-content ${isNumber ? 'number' : ''} ${isError ? 'error' : ''}`}>
