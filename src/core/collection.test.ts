@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { Collection } from './collection'
 import { Delta } from './delta'
+import { Input } from './input'
 
 describe('Collection', () => {
   describe('from', () => {
@@ -145,14 +146,13 @@ describe('Collection', () => {
     })
 
     it('re-emits all items when the latest side changes', () => {
-      const { Input } = require('./input')
       const items = new Input<number>()
       const context = new Input<string>()
       const combined = items.withLatest(context)
 
       const current: Map<number, [number, string]> = new Map()
 
-      combined.subscribe(([item, ctx], delta) => {
+      combined.subscribe(([item, ctx]: [number, string], delta: Delta) => {
         if (delta === Delta.Insert) {
           current.set(item, [item, ctx])
         } else {

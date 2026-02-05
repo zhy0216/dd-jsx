@@ -325,6 +325,7 @@ class WithLatestCollection<T, U> extends Collection<[T, U]> {
   private latestOther: U | undefined
   private hasLatest = false
   private currentItems: Set<T> = new Set()
+  private emittedTuples: Map<T, [T, U]> = new Map()  // Track emitted tuples for retract
 
   constructor(
     private upstream: Collection<T>,
@@ -347,11 +348,18 @@ class WithLatestCollection<T, U> extends Collection<[T, U]> {
         // Re-emit all current items with new latest value
         if (hadLatest) {
           for (const t of this.currentItems) {
-            this.emit([t, oldLatest!], Delta.Retract)
+            // Use the stored tuple reference for retract
+            const oldTuple = this.emittedTuples.get(t)
+            if (oldTuple) {
+              this.emit(oldTuple, Delta.Retract)
+            }
           }
         }
         for (const t of this.currentItems) {
-          this.emit([t, item], Delta.Insert)
+          // Create and store new tuple for insert
+          const newTuple: [T, U] = [t, item]
+          this.emittedTuples.set(t, newTuple)
+          this.emit(newTuple, Delta.Insert)
         }
       }
     })
@@ -361,12 +369,20 @@ class WithLatestCollection<T, U> extends Collection<[T, U]> {
       if (delta === Delta.Insert) {
         this.currentItems.add(item)
         if (this.hasLatest) {
-          this.emit([item, this.latestOther!], Delta.Insert)
+          // Create and store tuple for insert
+          const tuple: [T, U] = [item, this.latestOther!]
+          this.emittedTuples.set(item, tuple)
+          this.emit(tuple, Delta.Insert)
         }
       } else {
         this.currentItems.delete(item)
         if (this.hasLatest) {
-          this.emit([item, this.latestOther!], Delta.Retract)
+          // Use stored tuple reference for retract
+          const tuple = this.emittedTuples.get(item)
+          if (tuple) {
+            this.emit(tuple, Delta.Retract)
+            this.emittedTuples.delete(item)
+          }
         }
       }
     })
@@ -376,6 +392,7 @@ class WithLatestCollection<T, U> extends Collection<[T, U]> {
       unsub()
       otherUnsub()
       this.currentItems.clear()
+      this.emittedTuples.clear()
     }
   }
 }
