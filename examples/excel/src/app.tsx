@@ -23,6 +23,9 @@ export function createExcelApp() {
   const editValue = input('')
   const isEditing = input(false)
 
+  // Performance metrics: track render counts per cell
+  const renderCounts = new Map<string, number>()
+
   // Build a map for quick cell lookups - used for formula evaluation
   const cellMap = new Map<string, Cell>()
 
@@ -203,9 +206,18 @@ export function createExcelApp() {
       const key = cellKey(col, row)
       const cell = cellMap.get(key)
 
+      // Track render count for this cell
+      const count = (renderCounts.get(key) ?? 0) + 1
+      renderCounts.set(key, count)
+
       if (isEditingThis) {
         return editValue.flatMap(val => (
-          <div class="grid-cell data-cell selected editing" key={`cell-${col}-${row}`}>
+          <div
+            class="grid-cell data-cell selected editing"
+            key={`cell-${col}-${row}`}
+            data-render-count={count}
+          >
+            {count > 1 && <span class={`render-badge ${count > 5 ? 'high' : ''}`} key={`badge-${col}-${row}`}>{count}</span>}
             <input
               key={`input-${col}-${row}`}
               class="cell-input"
@@ -239,6 +251,7 @@ export function createExcelApp() {
         <div
           class={`grid-cell data-cell ${isSelected ? 'selected' : ''}`}
           key={`cell-${col}-${row}`}
+          data-render-count={count}
           onClick={() => selectCell(col, row)}
           onDblClick={() => startEditing()}
           onKeydown={(e: KeyboardEvent) => {
@@ -271,6 +284,7 @@ export function createExcelApp() {
           }}
           tabIndex={isSelected ? 0 : -1}
         >
+          {count > 1 && <span class={`render-badge ${count > 5 ? 'high' : ''}`} key={`badge-${col}-${row}`}>{count}</span>}
           <div class={`cell-content ${isNumber ? 'number' : ''} ${isError ? 'error' : ''}`}>
             {displayValue}
           </div>
@@ -376,6 +390,8 @@ export function createExcelApp() {
     cancelEdit,
     moveSelection,
     getCellValue,
+    renderCounts,
+    resetRenderCounts: () => renderCounts.clear(),
     App
   }
 }
