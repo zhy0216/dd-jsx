@@ -176,6 +176,128 @@ describe('Collection', () => {
     })
   })
 
+  describe('combineLatest', () => {
+    it('emits when either side changes', () => {
+      const a = new Input<number>()
+      const b = new Input<string>()
+      const combined = a.combineLatest(b)
+      const changes: [Delta, [number, string]][] = []
+
+      combined.subscribe((item, delta) => {
+        changes.push([delta, item])
+      })
+
+      // No emission until both have values
+      a.set(1)
+      expect(changes).toEqual([])
+
+      // First emission when both have values
+      b.set('x')
+      expect(changes).toEqual([[Delta.Insert, [1, 'x']]])
+
+      // Emits when A changes
+      a.set(2)
+      expect(changes).toEqual([
+        [Delta.Insert, [1, 'x']],
+        [Delta.Retract, [1, 'x']],
+        [Delta.Insert, [2, 'x']]
+      ])
+
+      // Emits when B changes
+      b.set('y')
+      expect(changes).toEqual([
+        [Delta.Insert, [1, 'x']],
+        [Delta.Retract, [1, 'x']],
+        [Delta.Insert, [2, 'x']],
+        [Delta.Retract, [2, 'x']],
+        [Delta.Insert, [2, 'y']]
+      ])
+    })
+
+    it('can be used to trigger re-render on multiple sources', () => {
+      const state = new Input<{ selected: boolean }>()
+      const data = new Input<{ value: string }>()
+      const trigger = state.combineLatest(data)
+
+      let renderCount = 0
+      let lastRender: [{ selected: boolean }, { value: string }] | null = null
+
+      trigger.subscribe((item, delta) => {
+        if (delta === Delta.Insert) {
+          renderCount++
+          lastRender = item
+        }
+      })
+
+      state.set({ selected: false })
+      data.set({ value: 'hello' })
+      expect(renderCount).toBe(1)
+      expect(lastRender).toEqual([{ selected: false }, { value: 'hello' }])
+
+      // State change triggers re-render
+      state.set({ selected: true })
+      expect(renderCount).toBe(2)
+      expect(lastRender).toEqual([{ selected: true }, { value: 'hello' }])
+
+      // Data change triggers re-render
+      data.set({ value: 'world' })
+      expect(renderCount).toBe(3)
+      expect(lastRender).toEqual([{ selected: true }, { value: 'world' }])
+    })
+  })
+
+  describe('startWith', () => {
+    it('emits initial value immediately', () => {
+      const upstream = new Input<string>()
+      const withDefault = upstream.startWith('default')
+      const changes: [Delta, string][] = []
+
+      withDefault.subscribe((item, delta) => {
+        changes.push([delta, item])
+      })
+
+      expect(changes).toEqual([[Delta.Insert, 'default']])
+    })
+
+    it('retracts initial when upstream emits', () => {
+      const upstream = new Input<string>()
+      const withDefault = upstream.startWith('default')
+      const changes: [Delta, string][] = []
+
+      withDefault.subscribe((item, delta) => {
+        changes.push([delta, item])
+      })
+
+      upstream.set('real')
+      expect(changes).toEqual([
+        [Delta.Insert, 'default'],
+        [Delta.Retract, 'default'],
+        [Delta.Insert, 'real']
+      ])
+    })
+
+    it('works with combineLatest for sparse collections', () => {
+      const state = new Input<{ selected: boolean }>()
+      const sparseData = new Input<{ value: string }>()
+
+      // sparseData might never emit, but startWith ensures combineLatest works
+      const trigger = state.combineLatest(sparseData.startWith({ value: '' }))
+
+      let lastValue: [{ selected: boolean }, { value: string }] | null = null
+      trigger.subscribe((item, delta) => {
+        if (delta === Delta.Insert) lastValue = item
+      })
+
+      // Works immediately because startWith provides initial value
+      state.set({ selected: true })
+      expect(lastValue).toEqual([{ selected: true }, { value: '' }])
+
+      // When real data arrives, it replaces the default
+      sparseData.set({ value: 'hello' })
+      expect(lastValue).toEqual([{ selected: true }, { value: 'hello' }])
+    })
+  })
+
   describe('filterBy', () => {
     it('filters using context from another collection', () => {
       const items = Collection.from([1, 2, 3, 4, 5])

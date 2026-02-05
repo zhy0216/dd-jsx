@@ -207,30 +207,15 @@ export function createExcelApp() {
       }))
       .distinct()
 
-    // Cell data changes trigger re-render via cellData filter
-    const cellData = cells.filter(c => c.col === col && c.row === row)
+    // Cell data for this position, with default for empty cells
+    const defaultCell: Cell = { col, row, rawValue: '', computedValue: '', isFormula: false }
+    const cellData = cells.filter(c => c.col === col && c.row === row).startWith(defaultCell)
 
-    // Re-render when either selection state changes OR cell data changes
-    // Use withLatest to combine cellState with a data version counter
-    // The counter increments on any cell data change, causing re-render
-    const cellDataVersion = input(0)
-    cellData.subscribe((_, delta) => {
-      if (delta === Delta.Insert) {
-        cellDataVersion.set(cellDataVersion.get()! + 1)
-      }
-    })
-    const trigger = cellState.withLatest(cellDataVersion)
+    // Re-render when either selection state OR cell data changes
+    // Both values flow through declaratively - no imperative .get() needed
+    const trigger = cellState.combineLatest(cellData)
 
-    return trigger.flatMap(() => {
-      // Read current state imperatively
-      const sel = selection.get()
-      const editing = isEditing.get()
-      const state = {
-        isSelected: sel?.col === col && sel?.row === row,
-        isEditing: sel?.col === col && sel?.row === row && editing
-      }
-      const cell = cellMap.get(key)
-
+    return trigger.flatMap(([state, cell]) => {
       // Track render count for this cell
       const count = (renderCounts.get(key) ?? 0) + 1
       renderCounts.set(key, count)

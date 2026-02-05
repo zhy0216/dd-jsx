@@ -54,6 +54,14 @@ export class Collection<T> {
     return new WithLatestCollection(this, other)
   }
 
+  combineLatest<U>(other: Collection<U>): Collection<[T, U]> {
+    return new CombineLatestCollection(this, other)
+  }
+
+  startWith(initial: T): Collection<T> {
+    return new StartWithCollection(this, initial)
+  }
+
   filterBy<U>(context: Collection<U>, predicate: (item: T, ctx: U) => boolean): Collection<T> {
     return new FilterByCollection(this, context, predicate)
   }
@@ -397,6 +405,108 @@ class WithLatestCollection<T, U> extends Collection<[T, U]> {
       otherUnsub()
       this.currentItems.clear()
       this.emittedTuples.clear()
+    }
+  }
+}
+
+/**
+ * CombineLatest emits [T, U] when EITHER collection changes.
+ * Unlike withLatest which only triggers on left-side changes,
+ * this triggers on changes from both sides.
+ * Only emits when both collections have values.
+ */
+class CombineLatestCollection<T, U> extends Collection<[T, U]> {
+  private latestA: T | undefined
+  private latestB: U | undefined
+  private hasA = false
+  private hasB = false
+  private emittedTuple: [T, U] | undefined
+
+  constructor(
+    private collectionA: Collection<T>,
+    private collectionB: Collection<U>
+  ) {
+    super()
+  }
+
+  subscribe(fn: Subscriber<[T, U]>): () => void {
+    this.subscribers.add(fn)
+
+    const maybeEmit = () => {
+      if (this.hasA && this.hasB) {
+        // Retract old tuple if exists
+        if (this.emittedTuple) {
+          this.emit(this.emittedTuple, Delta.Retract)
+        }
+        // Emit new tuple
+        const newTuple: [T, U] = [this.latestA!, this.latestB!]
+        this.emittedTuple = newTuple
+        this.emit(newTuple, Delta.Insert)
+      }
+    }
+
+    const unsubA = this.collectionA.subscribe((item, delta) => {
+      if (delta === Delta.Insert) {
+        this.latestA = item
+        this.hasA = true
+        maybeEmit()
+      }
+    })
+
+    const unsubB = this.collectionB.subscribe((item, delta) => {
+      if (delta === Delta.Insert) {
+        this.latestB = item
+        this.hasB = true
+        maybeEmit()
+      }
+    })
+
+    return () => {
+      this.subscribers.delete(fn)
+      unsubA()
+      unsubB()
+      this.emittedTuple = undefined
+    }
+  }
+}
+
+/**
+ * StartWith emits an initial value immediately, then forwards upstream.
+ * Useful with combineLatest when one side might be empty/sparse.
+ * When upstream emits, the initial value is retracted and replaced.
+ */
+class StartWithCollection<T> extends Collection<T> {
+  private hasUpstreamValue = false
+  private initialEmitted = false
+
+  constructor(
+    private upstream: Collection<T>,
+    private initial: T
+  ) {
+    super()
+  }
+
+  subscribe(fn: Subscriber<T>): () => void {
+    this.subscribers.add(fn)
+
+    // Emit initial value first
+    this.emit(this.initial, Delta.Insert)
+    this.initialEmitted = true
+
+    const unsub = this.upstream.subscribe((item, delta) => {
+      if (delta === Delta.Insert) {
+        // Retract initial if this is first upstream value
+        if (!this.hasUpstreamValue && this.initialEmitted) {
+          this.emit(this.initial, Delta.Retract)
+        }
+        this.hasUpstreamValue = true
+      }
+      this.emit(item, delta)
+    })
+
+    return () => {
+      this.subscribers.delete(fn)
+      unsub()
     }
   }
 }
